@@ -17,7 +17,6 @@ void run_uninstall(const string& pkg_name) {
             "Cannot uninstall adopted package: " + pkg_name +
             "\nAdopted packages are managed by LFS, not HSPM.");
     
-    // check nothing depends on this package
     vector<string> dependents = db_get_dependents(pkg_name);
     if (!dependents.empty()) {
         string msg = "Cannot uninstall " + pkg_name
@@ -31,7 +30,6 @@ void run_uninstall(const string& pkg_name) {
     std::cout << "Uninstalling " << rec.name
               << " " << rec.version << "...\n";
 
-    // remove all symlinks
     vector<string> files = db_get_files(rec.id);
     int removed = 0;
     for (const auto& path : files) {
@@ -42,7 +40,6 @@ void run_uninstall(const string& pkg_name) {
         }
     }
 
-    // remove store directory
     if (!rec.store_path.empty() && fs::exists(rec.store_path)) {
         fs::remove_all(rec.store_path);
         std::cout << "  store removed: " << rec.store_path << "\n";

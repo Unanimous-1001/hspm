@@ -9,19 +9,24 @@ void print_usage() {
     std::cout << "   install  <name>          Install a package and its dependencies\n";
     std::cout << "   uninstall <name>         Remove a managed package\n";
     std::cout << "   adopt    <name> <ver>    Record a pre-installed package\n";
+    std::cout << "   adopt    all             Auto-adopt all installed system packages\n";
     std::cout << "   show     <name>          Print recipe fields\n";
     std::cout << "   resolve  <name>          Print dependency install order\n";
     std::cout << "   upgrade  <name> <ver>    Upgrade to a new version\n";
     std::cout << "   prune    <name> <ver>    Delete an inactive store dir\n";
     std::cout << "   log                      Show recent operations\n";
+    std::cout << "   rollback <name>          Clean up a partial install\n";
+    std::cout << "   rescue   [--flag]        Database and system recovery tools\n";
     std::cout << "   verify                   Check symlinks and database\n";
-    std::cout << "   sync     [version]       Sync recipes from BLFS book\n";
+    std::cout << "   sync     [version]       Sync recipes from BLFS book (default: stable)\n";
     std::cout << "   list                     Show all installed packages\n";
     std::cout << "   activate <name> <ver>    Swap symlinks to a stored version\n";
     std::cout << "   help                     Show this help message\n\n";
     std::cout << " Options:\n";
+    std::cout << "   --interactive            Prompt for build commands on complex packages\n";
     std::cout << "   --force-symlink          Replace unknown symlinks\n";
-    std::cout << "   --adopt-collision        Adopt colliding real files\n\n";
+    std::cout << "   --adopt-collision        Adopt colliding real files\n";
+    std::cout << "   --yes, -y                Auto-answer yes to all prompts\n\n";
 }
 
 CliArgs parse_args(int argc, char* argv[]) {
@@ -37,6 +42,10 @@ CliArgs parse_args(int argc, char* argv[]) {
         string a = argv[i];
         if      (a == "--force-symlink")    args.force_symlink   = true;
         else if (a == "--adopt-collision")  args.adopt_collision = true;
+        else if (a == "--interactive")      args.interactive     = true;
+        else if (a == "--yes" || a == "-y") args.yes             = true;
+        else if (a == "--force")    args.force    = true;
+        else if (a == "--dry-run")  args.dry_run  = true;
         else if (args.package_name.empty()) args.package_name    = a;
         else if (args.version.empty())      args.version         = a;
     }

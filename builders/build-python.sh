@@ -23,7 +23,6 @@ echo "[build-python] Building $PKG_NAME into $DESTDIR"
 
 cd "$SRC_DIR"
 
-# Support both old setup.py and modern pip/pyproject.toml
 if [ -f "setup.py" ]; then
     python3 setup.py build $EXTRA_ARGS
     python3 setup.py install \

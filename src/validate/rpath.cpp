@@ -15,8 +15,6 @@ static bool is_elf(const string& path) {
 }
 
 static string run_ldd(const string& binary, const string& store_dir) {
-    // add the store's lib directory to LD_LIBRARY_PATH so ldd can
-    // resolve libraries that are in the same package's store
     string lib_path = store_dir + "/usr/lib:" +
                       store_dir + "/usr/lib64:" +
                       store_dir + "/lib";
@@ -45,7 +43,6 @@ vector<RpathResult> validate_rpath(const string& store_dir) {
         string line;
 
         while (std::getline(ss, line)) {
-            // fatal: library completely missing
             if (line.find("not found") != string::npos) {
                 results.push_back({
                     RpathStatus::Fatal,
@@ -55,13 +52,10 @@ vector<RpathResult> validate_rpath(const string& store_dir) {
                 continue;
             }
 
-            // check resolved paths
             if (line.find("=>") != string::npos) {
-                // skip kernel virtual DSO — always fine
                 if (line.find("linux-vdso") != string::npos)
                     continue;
 
-                // extract resolved path between "=>" and "("
                 size_t arrow = line.find("=>");
                 size_t paren = line.find("(", arrow);
                 if (arrow == string::npos || paren == string::npos)
@@ -69,7 +63,6 @@ vector<RpathResult> validate_rpath(const string& store_dir) {
 
                 string resolved = line.substr(arrow + 3,
                                   paren - arrow - 4);
-                // trim whitespace
                 size_t s = resolved.find_first_not_of(" \t");
                 size_t e = resolved.find_last_not_of(" \t");
                 if (s == string::npos) continue;
@@ -78,19 +71,15 @@ vector<RpathResult> validate_rpath(const string& store_dir) {
                 if (resolved.empty() || resolved == "not found")
                     continue;
 
-                // resolves into our store — correct
                 if (resolved.find(HSPM_STORE)
                     != string::npos)
                     continue;
 
-                // system library paths — expected for adopted packages
                 if (resolved.find("/lib")  != string::npos ||
                     resolved.find("/usr")  != string::npos) {
-                    // this is fine — system/adopted library
                     continue;
                 }
 
-                // anything else is suspicious
                 results.push_back({
                     RpathStatus::Warning,
                     path,

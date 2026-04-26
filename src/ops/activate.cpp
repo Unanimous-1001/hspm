@@ -11,7 +11,6 @@ void run_activate(const string& pkg_name, const string& version) {
     if (pkg_name.empty() || version.empty())
         throw runtime_error("Usage: hspm activate <name> <version>");
 
-    // find the target version in the database
     PackageRecord target = db_get_package_version(pkg_name, version);
     if (target.id == -1)
         throw runtime_error(
@@ -30,14 +29,12 @@ void run_activate(const string& pkg_name, const string& version) {
             pkg_name + " " + version + " is in partial state. "
             "Run 'hspm rollback " + pkg_name + "' first.");
 
-    // verify store directory still exists
     if (target.store_path.empty() || !fs::exists(target.store_path))
         throw runtime_error(
             "Store directory missing for " + pkg_name
             + " " + version + ".\n"
             "Cannot activate — store was pruned.");
 
-    // find currently active version
     PackageRecord current = db_get_package(pkg_name);
 
     std::cout << "Activating " << pkg_name << " " << version;
@@ -45,7 +42,6 @@ void run_activate(const string& pkg_name, const string& version) {
         std::cout << " (replacing " << current.version << ")";
     std::cout << "\n";
 
-    // remove current active symlinks
     if (current.id != -1 && current.state == "active") {
         vector<string> old_files = db_get_files(current.id);
         for (const auto& path : old_files) {
@@ -57,11 +53,9 @@ void run_activate(const string& pkg_name, const string& version) {
         std::cout << "[activate] Old version deactivated\n";
     }
 
-    // activate the target version
     vector<string> new_files = scan_manifest(target.store_path);
     bool ok = symlink_transaction(target.id, new_files, STORE, LIVE);
     if (!ok) {
-        // restore old version if possible
         if (current.id != -1) {
             vector<string> old_files = db_get_files(current.id);
             symlink_transaction(current.id, old_files, STORE, LIVE);

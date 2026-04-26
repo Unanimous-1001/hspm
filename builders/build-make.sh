@@ -23,8 +23,6 @@ echo "[build-make] Building $PKG_NAME into $DESTDIR"
 
 cd "$SRC_DIR"
 
-# Some plain Makefile packages need prefix set differently
-# Try standard DESTDIR first, fall back to prefix override
 make -j"$(nproc)" \
     PREFIX="$PREFIX" \
     prefix="$PREFIX" \

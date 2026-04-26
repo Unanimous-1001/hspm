@@ -25,7 +25,6 @@ void run_rollback(const string& pkg_name) {
     
     int removed = 0;
 
-    // check pending_links table first — catches crash mid-transaction
     auto pending = db_pending_get_done(rec.id);
     if (!pending.empty()) {
         std::cout << "  Found " << pending.size()
@@ -40,7 +39,6 @@ void run_rollback(const string& pkg_name) {
         db_pending_clear(rec.id);
     }
 
-    // also remove any completed symlinks from files table
     vector<string> files = db_get_files(rec.id);
     for (const auto& path : files) {
         if (fs::is_symlink(path)) {
@@ -50,7 +48,6 @@ void run_rollback(const string& pkg_name) {
         }
     }
 
-    // remove the store directory
     if (!rec.store_path.empty() && fs::exists(rec.store_path)) {
         fs::remove_all(rec.store_path);
         std::cout << "  removed store: " << rec.store_path << "\n";

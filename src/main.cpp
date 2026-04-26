@@ -13,6 +13,7 @@
 #include "ops/upgrade.hpp"
 #include "ops/list.hpp"
 #include "ops/activate.hpp"
+#include "ops/rescue.hpp"
 
 static const string DB_PATH = HSPM_DB;
 
@@ -25,7 +26,6 @@ int main(int argc, char* argv[]) {
         return 0;
     }
     
-    // init is special, runs before db exists
     if (args.subcommand == "init") {
         fs::create_directories(HSPM_STORE);
         fs::create_directories(HSPM_BUILD);
@@ -41,7 +41,6 @@ int main(int argc, char* argv[]) {
         return 0;
     }
     
-    // all other commands need the DB
     try {
         db_open(DB_PATH);
         db_set_log_path(HSPM_LOG);
@@ -86,14 +85,8 @@ int main(int argc, char* argv[]) {
                 std::cout << "  " << n << "\n";
         }
         else if (args.subcommand == "log") {
-            // --package <name> filters by package
-            // --operation <op> filters by operation type
             string pkg_filter;
             string op_filter;
-            // reuse package_name for package filter
-            // reuse version for operation filter
-            // e.g. "hspm log curl" -> package filter
-            //      "hspm log install" -> operation filter
             string filter = args.package_name;
             if (filter == "install"   || filter == "uninstall" ||
                 filter == "adopt"     || filter == "upgrade"   ||
@@ -151,6 +144,11 @@ int main(int argc, char* argv[]) {
         }
         else if (args.subcommand == "activate") {
             run_activate(args.package_name, args.version);
+        }
+        else if (args.subcommand == "rescue") {
+            string flag = args.package_name.empty()
+                        ? "" : args.package_name;
+            run_rescue(flag, args.yes, args.force);
         }
 
         else {

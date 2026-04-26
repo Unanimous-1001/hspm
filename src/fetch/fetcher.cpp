@@ -8,7 +8,6 @@ static bool verify_pkg_checksum(const string& filepath,
         return verify_checksum(filepath, pkg.sha256);
     if (!pkg.md5.empty())
         return verify_md5(filepath, pkg.md5);
-    // no checksum — this shouldn't happen but don't block
     std::cerr << "[checksum] WARNING: no checksum for "
               << pkg.name << " — skipping verification\n";
     return true;
@@ -36,9 +35,6 @@ static string download(const string& url, const Package& pkg) {
     return dest;
 }
 
-// Check blfs-urls.txt for a URL override
-// File format: one entry per line — "name-version url"
-// e.g. "zlib-1.3.1 https://www.zlib.net/fossils/zlib-1.3.1.tar.gz"
 static string find_in_url_cache(const Package& pkg) {
     std::ifstream file(URL_CACHE);
     if (!file) return "";
@@ -57,7 +53,6 @@ static string find_in_url_cache(const Package& pkg) {
 }
 
 string fetch_tarball(const Package& pkg) {
-    // Stage 1: local distfiles cache
     string found = find_in_distfiles(pkg);
     if (!found.empty()) {
         std::cout << "[fetch] Found in distfiles: " << found << "\n";
@@ -66,10 +61,8 @@ string fetch_tarball(const Package& pkg) {
         return found;
     }
 
-    // Stage 2: check blfs-urls.txt cache first, then recipe URLs
     string cached_url = find_in_url_cache(pkg);
 
-    // build list of URLs to try: cache override first, then recipe URLs
     vector<string> urls_to_try;
     if (!cached_url.empty()) {
         std::cout << "[fetch] Found URL in cache: " << cached_url << "\n";
@@ -94,7 +87,6 @@ string fetch_tarball(const Package& pkg) {
         }
     }
 
-    // Stage 3: interactive prompt
     std::cout << "[fetch] Cannot find tarball for "
               << pkg.name << "-" << pkg.version << "\n"
               << "        Enter a download URL (or leave blank to abort): ";

@@ -23,7 +23,6 @@ echo "[build-perl] Building $PKG_NAME into $DESTDIR"
 
 cd "$SRC_DIR"
 
-# Perl modules use Makefile.PL or Build.PL
 if [ -f "Makefile.PL" ]; then
     perl Makefile.PL \
         PREFIX="$PREFIX" \

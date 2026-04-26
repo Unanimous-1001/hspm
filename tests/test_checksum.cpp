@@ -1,6 +1,3 @@
-// Build and run:
-//   g++ -std=c++17 -Isrc tests/test_checksum.cpp src/fetch/checksum.cpp -o test_checksum
-//   ./test_checksum
 
 #include "test_helpers.hpp"
 #include "fetch/checksum.hpp"
@@ -14,8 +11,6 @@ int main() {
     system(("mkdir -p " + tmp).c_str());
 
     test("sha256 of known content", [&]() {
-        // echo -n "hello" | sha256sum
-        // = 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
         std::string path = tmp + "hello.txt";
         std::ofstream f(path);
         f << "hello";
@@ -60,7 +55,6 @@ int main() {
             "sha256 of empty file");
     });
 
-    // cleanup
     system(("rm -rf " + tmp).c_str());
 
     print_results();

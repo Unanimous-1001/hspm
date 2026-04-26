@@ -1,7 +1,6 @@
 #pragma once
 #include <string>
 
-// Paths set at compile time via Makefile defines.
 // Override: make PREFIX=/opt/hspm LIVE=/usr DISTFILES=/usr/src/distfiles/
 
 #ifndef HSPM_ROOT_PATH

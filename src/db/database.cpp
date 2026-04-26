@@ -243,7 +243,6 @@ vector<LogRecord> db_get_log_by_operation(const string& operation) {
 }
 
 void db_delete_package(int package_id) {
-    // delete files first due to foreign key reference
     const char* sql1 = "DELETE FROM files WHERE package_id = ?";
     sqlite3_stmt* stmt;
     check(sqlite3_prepare_v2(g_db, sql1, -1, &stmt, nullptr),
@@ -252,7 +251,6 @@ void db_delete_package(int package_id) {
     check(sqlite3_step(stmt), "delete_files step");
     sqlite3_finalize(stmt);
 
-    // then delete the package record
     const char* sql2 = "DELETE FROM packages WHERE id = ?";
     check(sqlite3_prepare_v2(g_db, sql2, -1, &stmt, nullptr),
           "delete_package prepare");
@@ -262,7 +260,6 @@ void db_delete_package(int package_id) {
 }
 
 vector<string> db_get_dependents(const string& pkg_name) {
-    // find all active managed packages that list pkg_name as a dependency
     const char* sql =
         "SELECT DISTINCT p.name FROM packages p "
         "JOIN dependencies d ON d.package_id = p.id "
@@ -373,7 +370,6 @@ void db_delete_inactive_package(const string& name,
             name + "-" + version
             + " is not inactive (state: " + rec.state + ")");
 
-    // delete files then package
     const char* sql1 = "DELETE FROM files WHERE package_id = ?";
     sqlite3_stmt* stmt;
     check(sqlite3_prepare_v2(g_db, sql1, -1, &stmt, nullptr),
@@ -393,7 +389,6 @@ void db_delete_inactive_package(const string& name,
 void db_pending_begin(int package_id,
                       const vector<string>& store_paths,
                       const vector<string>& live_paths) {
-    // clear any leftover pending entries for this package
     const char* clear_sql =
         "DELETE FROM pending_links WHERE package_id = ?";
     sqlite3_stmt* stmt;
@@ -403,7 +398,6 @@ void db_pending_begin(int package_id,
     check(sqlite3_step(stmt), "pending_clear step");
     sqlite3_finalize(stmt);
 
-    // insert all planned links as 'pending'
     const char* sql =
         "INSERT INTO pending_links "
         "(package_id, store_path, live_path, state) "

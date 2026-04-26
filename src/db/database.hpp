@@ -43,27 +43,21 @@ void db_log(const string& operation, int package_id, const string& detail);
 
 void db_delete_package(int package_id);
 
-// Returns names of active managed packages that depend on pkg_name
 vector<string> db_get_dependents(const string& pkg_name);
 
-// Insert a dependency edge between two packages
 void db_insert_dependency(int package_id, int depends_on_id);
 
-// Get a specific version of a package
 PackageRecord db_get_package_version(const string& name,
                                      const string& version);
 
-// Set a package inactive (used during upgrade swap)
 void db_set_package_inactive(int package_id);
 
-// Get all packages (used by upgrade and verify)
 vector<PackageRecord> db_get_all_packages();
 
 void db_delete_inactive_package(const string& name, const string& version);
 
 void db_set_log_path(const string& path);
 
-// Pending links transaction support
 void db_pending_begin(int package_id,
                       const vector<string>& store_paths,
                       const vector<string>& live_paths);

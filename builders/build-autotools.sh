@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# --- Parse arguments ---
+# parse args
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --name)       PKG_NAME="$2";    shift 2 ;;
@@ -15,7 +15,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# --- Validate required args ---
 : "${PKG_NAME:?--name is required}"
 : "${DESTDIR:?--destdir is required}"
 : "${PREFIX:?--prefix is required}"
@@ -25,16 +24,16 @@ echo "[build-autotools] Building $PKG_NAME into $DESTDIR"
 
 cd "$SRC_DIR"
 
-# --- Configure ---
+#config
 ./configure \
     --prefix="$PREFIX" \
     $EXTRA_ARGS
 
-# --- Build ---
+#build
 make -j"$(nproc)"
 
-# --- Stage install into DESTDIR ---
+#DESTDIR
 make install DESTDIR="$DESTDIR"
 
-# --- Signal completion to controller ---
+#send cmplte
 echo "MANIFEST_READY"

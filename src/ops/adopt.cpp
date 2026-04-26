@@ -3,7 +3,6 @@
 #include <cstdlib>
 #include <cctype>
 
-// Adopt a single named package
 static void adopt_one(const string& pkg_name, const string& version) {
     PackageRecord existing = db_get_package(pkg_name);
     if (existing.id != -1) {
@@ -20,7 +19,6 @@ static void adopt_one(const string& pkg_name, const string& version) {
 }
 
 static string extract_version(const string& output) {
-    // extract first X.Y or X.Y.Z pattern from a string
     size_t i = 0;
     while (i < output.size()) {
         if (isdigit(output[i])) {
@@ -29,7 +27,6 @@ static string extract_version(const string& output) {
                    (isdigit(output[i]) || output[i] == '.'))
                 i++;
             string candidate = output.substr(start, i - start);
-            // must have at least one dot to be a version
             if (candidate.find('.') != string::npos)
                 return candidate;
         }
@@ -63,14 +60,10 @@ static string detect_version(const string& name) {
 static void adopt_lfs_base() {
     std::cout << "Scanning installed system binaries...\n\n";
 
-    // scan /usr/bin and /usr/sbin for installed binaries
-    // for each unique package, detect version and adopt
     vector<string> scan_dirs = {
         "/usr/bin", "/usr/sbin", "/bin", "/sbin"
     };
 
-    // well-known binary -> package name mapping
-    // maps the binary name to the package it belongs to
     unordered_map<string, string> bin_to_pkg = {
         {"bash",       "bash"},
         {"gcc",        "gcc"},
@@ -130,18 +123,15 @@ static void adopt_lfs_base() {
         {"readline",   "readline"},
     };
 
-    // track what we've already adopted to avoid duplicates
     unordered_set<string> adopted;
     int count = 0;
 
     for (const auto& [binary, pkg_name] : bin_to_pkg) {
         if (adopted.count(pkg_name)) continue;
 
-        // check if binary exists
         string check = "which " + binary + " >/dev/null 2>&1";
         if (system(check.c_str()) != 0) continue;
 
-        // check if already in database
         PackageRecord existing = db_get_package(pkg_name);
         if (existing.id != -1) {
             std::cout << "  skip (already recorded): "
@@ -150,7 +140,6 @@ static void adopt_lfs_base() {
             continue;
         }
 
-        // detect version
         string version = detect_version(binary);
 
         adopt_one(pkg_name, version);
@@ -174,7 +163,6 @@ static void adopt_lfs_base() {
             PackageRecord existing = db_get_package(pkg_name);
             if (existing.id != -1) continue;
 
-            // get version from pkg-config
             string ver_cmd = "timeout 2 pkg-config --modversion " +
                              pkg_name + " 2>/dev/null";
             FILE* vpipe = popen(ver_cmd.c_str(), "r");
@@ -207,7 +195,6 @@ void run_adopt(const string& pkg_name, const string& version) {
             "Usage: hspm adopt <name> <version>\n"
             "       hspm adopt all");
 
-    // special case: adopt all LFS base packages
     if (pkg_name == "all") {
         adopt_lfs_base();
         return;
@@ -217,7 +204,6 @@ void run_adopt(const string& pkg_name, const string& version) {
         throw runtime_error(
             "Usage: hspm adopt <name> <version>");
 
-    // check not already recorded
     PackageRecord existing = db_get_package(pkg_name);
     if (existing.id != -1)
         throw runtime_error(

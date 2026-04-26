@@ -23,7 +23,6 @@ echo "[build-openssl] Building $PKG_NAME into $DESTDIR"
 
 cd "$SRC_DIR"
 
-# OpenSSL uses ./Configure not ./configure
 ./Configure \
     --prefix="$PREFIX" \
     --openssldir="$PREFIX/etc/ssl" \

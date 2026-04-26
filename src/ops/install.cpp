@@ -8,20 +8,44 @@
 #include "store/symlink.hpp"
 #include "validate/rpath.hpp"
 #include "config.hpp"
+#include "cli/prompt.hpp"
+#include "core/package.hpp"
 
 static const string STORE    = HSPM_STORE;
 static const string BUILD    = HSPM_BUILD;
 static const string LIVE     = HSPM_LIVE;
 static const string BUILDERS = HSPM_BUILDERS;
+static vector<pair<string, string>> collect_kernel_hints(const vector<string>& queue) {
+    vector<pair<string, string>> hints;
+    for (const auto& entry : queue) {
+        string pkg_name = entry;
+        size_t colon = entry.find(':');
+        if (colon != string::npos)
+            pkg_name = entry.substr(0, colon);
+        
+        PackageRecord rec = db_get_package(pkg_name);
+        if (rec.id != -1 && rec.state == "active")
+            continue;
+        
+        try {
+            Package pkg = load_recipe(pkg_name);
+            if (!pkg.kernel_hint.empty())
+                hints.push_back({pkg_name, pkg.kernel_hint});
+        } catch (...) {
+        }
+    }
+    return hints;
+}
 
 static void install_single(const string& pkg_name,
                            bool force_symlink   = false,
-                           bool adopt_collision = false) {
+                           bool adopt_collision = false,
+                           bool interactive     = false) {
     Package pkg = load_recipe(pkg_name);
     std::cout << "\n=== Installing " << pkg.name
               << " " << pkg.version << " ===\n";
 
-    // check if already installed
+    // lil check
     PackageRecord existing = db_get_package(pkg.name);
     if (existing.id != -1 && existing.state == "active") {
         std::cout << "[skip] " << pkg.name
@@ -29,26 +53,99 @@ static void install_single(const string& pkg_name,
         return;
     }
 
-    // Step 1: fetch
+    // 1.fetch
     string tarball = fetch_tarball(pkg);
     std::cout << "[fetch] OK\n";
 
-    // Step 2: extract
-    string src_dir = BUILD + pkg.name + "-" + pkg.version;
-    fs::create_directories(src_dir);
+    // 2. extract
     string extract_cmd = "tar xf " + tarball + " -C " + BUILD;
     if (system(extract_cmd.c_str()) != 0)
         throw runtime_error("Extraction failed");
     std::cout << "[extract] OK\n";
 
-    // Step 3: build using the correct builder
+    string src_dir = BUILD + pkg.name + "-" + pkg.version;
+    if (!fs::exists(src_dir)) {
+        for (auto& entry : fs::directory_iterator(BUILD)) {
+            if (fs::is_directory(entry)) {
+                string dirname = entry.path().filename().string();
+                if (dirname.find(pkg.version) != string::npos) {
+                    src_dir = entry.path().string();
+                    std::cout << "[extract] Source dir: " << src_dir << "\n";
+                    break;
+                }
+            }
+        }
+    }
+    
+	// 3 .prompt when needed
+	if (interactive && (pkg.complex || !pkg.build_cmd.empty())) {
+		try {
+			if (!pkg.patches.empty()) {
+				std::cout << "[patches] Downloading patches...\n";
+				string patch_dir = BUILD;
+				std::istringstream pss(pkg.patches);
+				string patch_url;
+				while (pss >> patch_url) {
+					string patch_file = patch_url.substr(
+						patch_url.rfind('/') + 1);
+					string patch_dest = patch_dir + patch_file;
+					string wget_cmd = "wget -O " + patch_dest
+									+ " " + patch_url;
+					if (system(wget_cmd.c_str()) == 0)
+						std::cout << "  downloaded: "
+								  << patch_file << "\n";
+					else
+						std::cerr << "  failed: " << patch_url << "\n";
+				}
+			}
+
+			BuildOverride ov = interactive_prompt(pkg, src_dir);
+
+			if (!ov.patch_cmds.empty()) {
+				std::cout << "[patches] Applying patches...\n";
+				string patch_cmd = "cd " + src_dir + " && "
+								 + ov.patch_cmds;
+				if (system(patch_cmd.c_str()) != 0)
+					throw runtime_error("Patch failed");
+				std::cout << "[patches] OK\n";
+			} else if (!pkg.patch_cmds.empty()) {
+				std::cout << "[patches] Applying patches...\n";
+				string patch_cmd = "cd " + src_dir + " && "
+								 + pkg.patch_cmds;
+				if (system(patch_cmd.c_str()) != 0)
+					throw runtime_error("Patch failed");
+				std::cout << "[patches] OK\n";
+			}
+
+			if (!ov.build_cmd.empty()) {
+				pkg.build_cmd = ov.build_cmd;
+			}
+
+			if (ov.save_to_recipe) {
+				pkg.complex   = false;
+				save_recipe(pkg, HSPM_RECIPES);
+				std::cout << "[recipe] Saved build commands.\n";
+			}
+		} catch (const runtime_error& e) {
+			string msg = e.what();
+			if (msg.find("User skipped") != string::npos)
+				throw;
+			std::cerr << "[prompt] " << msg << "\n";
+		}
+	} else if (!interactive && pkg.complex
+			   && pkg.build_cmd.empty()) {
+		std::cout << "[warn] " << pkg.name
+				  << " is a complex package with no saved build commands.\n"
+				  << "       Attempting default build — may fail.\n"
+				  << "       Use --interactive to configure manually.\n";
+	}
+
+	// 4. build using corect builder
     string store_dir = STORE + pkg.name + "-" + pkg.version;
     fs::create_directories(store_dir);
     string build_cmd;
 	if (!pkg.build_cmd.empty()) {
-		// custom build command — substitute variables
 		build_cmd = pkg.build_cmd;
-		// replace placeholders
 		auto replace_all = [](string& s,
 							  const string& from,
 							  const string& to) {
@@ -78,11 +175,11 @@ static void install_single(const string& pkg_name,
 		throw runtime_error("Build failed for: " + pkg.name);
     std::cout << "[build] OK\n";
 
-    // Step 4: scan manifest
+    // 5. scan manifest
     vector<string> files = scan_manifest(store_dir);
     std::cout << "[manifest] " << files.size() << " files\n";
     
-    // Step 5: RPATH validation
+    // 6. RPATH valid
         std::cout << "[rpath] Validating binaries...\n";
         vector<RpathResult> rpath_results = validate_rpath(store_dir);
         bool has_fatal = false;
@@ -102,7 +199,7 @@ static void install_single(const string& pkg_name,
                 "\nBinaries have unresolved library dependencies.");
         std::cout << "[rpath] OK\n";
 
-    // Step 6: collision check
+    // 7. collision check
     auto [collision_path, collision_result] =
             check_manifest_collisions(files, STORE, LIVE,
                 force_symlink, adopt_collision);
@@ -110,19 +207,24 @@ static void install_single(const string& pkg_name,
         throw runtime_error("Collision at: " + collision_path);
     std::cout << "[collision] OK\n";
 
-    // Step 7: register in DB as partial
+    // 8 .register in DB as partial
     int pkg_id = db_insert_package(
         pkg.name, pkg.version,
         "managed", "partial", store_dir);
     
-    // record dependency edges in the database
         for (const auto& dep_name : pkg.depends) {
             PackageRecord dep_rec = db_get_package(dep_name);
             if (dep_rec.id != -1)
                 db_insert_dependency(pkg_id, dep_rec.id);
         }
-
-    // Step 8: symlink transaction
+    //.hspm-meta sidecars- for disaster recovery
+    save_recipe(pkg, store_dir + "/");
+    string sidecar_src  = store_dir + "/" + pkg.name + ".recipe";
+    string sidecar_dest = store_dir + "/.hspm-meta";
+    if (fs::exists(sidecar_src))
+        fs::rename(sidecar_src, sidecar_dest);
+    
+    // 9. symlink transaction
     std::cout << "[symlink] Linking files...\n";
     bool ok = symlink_transaction(pkg_id, files, STORE, LIVE);
     if (!ok) throw runtime_error("Symlink transaction failed");
@@ -145,7 +247,6 @@ static void install_stub(const string& pkg_name) {
     string store_dir = STORE + pkg.name + "-" + pkg.version + "-stub";
     fs::create_directories(store_dir);
 
-    // run the bootstrap script instead of the normal builder
     string build_cmd =
         HSPM_ROOT + "/" + pkg.bootstrap_script +
         " --name "    + pkg.name +
@@ -157,7 +258,6 @@ static void install_stub(const string& pkg_name) {
     if (system(build_cmd.c_str()) != 0)
         throw runtime_error("Stub build failed for: " + pkg_name);
 
-    // register stub in DB
     int pkg_id = db_insert_package(
         pkg.name + "-stub", pkg.version,
         "managed", "partial", store_dir);
@@ -170,7 +270,6 @@ static void install_stub(const string& pkg_name) {
 }
 
 static void install_rebuild(const string& pkg_name) {
-    // uninstall the stub first
     string stub_name = pkg_name + "-stub";
     PackageRecord stub_rec = db_get_package(stub_name);
     if (stub_rec.id != -1) {
@@ -183,7 +282,6 @@ static void install_rebuild(const string& pkg_name) {
         std::cout << "[circular] Stub removed for " << pkg_name << "\n";
     }
 
-    // now do a full install
     install_single(pkg_name, false, false);
 }
 
@@ -191,20 +289,42 @@ void run_install(const string& pkg_name, const CliArgs& args) {
     if (pkg_name.empty())
         throw runtime_error("Usage: hspm install <name>");
 
-    // ensure live dirs exist
     fs::create_directories(LIVE + "/bin");
     fs::create_directories(LIVE + "/lib");
     fs::create_directories(LIVE + "/include");
 
-    // resolve full dependency queue
     vector<string> queue = get_install_queue(pkg_name);
 
     std::cout << "Packages to install (" << queue.size() << "):\n";
+    
+    auto kernel_hints = collect_kernel_hints(queue);
+	if (!kernel_hints.empty()) {
+		std::cout << "\n*** KERNEL CONFIGURATION NOTES ***\n";
+		std::cout << "The following packages mention specific kernel options in BLFS.\n";
+		std::cout << "Your kernel may need to be reconfigured for these packages to work.\n\n";
+		
+		for (const auto& [name, hint] : kernel_hints) {
+			std::cout << "[" << name << "]\n";
+			std::cout << hint << "\n\n";
+		}
+		
+		if (!args.yes) {
+			std::cout << "Continue with installation? [y/N] ";
+			string answer;
+			std::getline(std::cin, answer);
+			if (answer != "y" && answer != "Y") {
+				std::cout << "\nInstallation aborted. No changes were made.\n";
+				std::cout << "Please reconfigure your kernel and try again.\n";
+				return;
+			}
+		} else {
+			std::cout << "[notice] --yes supplied: proceeding automatically.\n";
+		}
+	}
+	
     for (const auto& n : queue)
         std::cout << "  " << n << "\n";
 
-    // install each in order
-	// handle circular dep markers: "pkg:stub" and "pkg:rebuild"
 	for (const auto& entry : queue) {
 		size_t colon = entry.find(':');
 		if (colon != string::npos) {
@@ -222,7 +342,8 @@ void run_install(const string& pkg_name, const CliArgs& args) {
 			}
 		} else {
             install_single(entry,
-                args.force_symlink, args.adopt_collision);
+                args.force_symlink, args.adopt_collision,
+                args.interactive);
         }
 	}
 

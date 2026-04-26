@@ -1,6 +1,5 @@
 CXX      = g++
 
-# Installation paths — override at build time:
 #   make PREFIX=/opt/hspm LIVE=/usr install
 PREFIX    ?= /opt/hspm
 LIVE      ?= /usr
@@ -47,8 +46,8 @@ test_recipe: tests/test_recipe_parser.cpp src/core/package.cpp
 	$(CXX) $(TEST_FLAGS) $^ -o test_recipe_parser
 	./test_recipe_parser
 
-test_graph: tests/test_graph.cpp src/core/graph.cpp src/core/package.cpp
-	$(CXX) $(TEST_FLAGS) $^ -o test_graph
+test_graph: tests/test_graph.cpp src/core/graph.cpp src/core/package.cpp src/db/database.cpp
+	$(CXX) $(TEST_FLAGS) $^ -o test_graph $(TEST_LIBS)
 	./test_graph
 
 test_checksum: tests/test_checksum.cpp src/fetch/checksum.cpp

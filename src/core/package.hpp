@@ -1,5 +1,6 @@
 #pragma once
 #include "common.hpp"
+#include "config.hpp"
 
 struct Package {
     string name;
@@ -13,11 +14,17 @@ struct Package {
     string bootstrap_script;
     string build_cmd;
     vector<string> depends;
-    string notes;           // scraped BLFS build commands
-    string patches;         // space-separated patch URLs
-    string patch_cmds;      // commands to apply patches
-    string extra_urls;      // space-separated extra download URLs
-    bool   complex = false; // true if non-standard build detected
+    vector<string> recommends;
+    string notes;
+    string patches;
+    string patch_cmds;
+    string extra_urls;
+    bool   complex = false;
+    string kernel_hint;//new dlt
 };
 
-Package load_recipe(const string& name);
+void save_recipe(const Package& pkg,
+                 const string& recipe_dir = HSPM_RECIPES);
+
+Package load_recipe(const string& name,
+                    const string& recipe_dir = HSPM_RECIPES);

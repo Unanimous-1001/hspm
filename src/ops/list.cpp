@@ -9,7 +9,6 @@ void run_list() {
         return;
     }
 
-    // column widths
     std::cout << "\n"
               << std::left
               << "  " << "NAME                     "
@@ -19,7 +18,6 @@ void run_list() {
               << "  " << string(65, '-') << "\n";
 
     for (const auto& pkg : packages) {
-        // pad columns manually
         string name    = pkg.name;
         string version = pkg.version;
         string type    = pkg.type;

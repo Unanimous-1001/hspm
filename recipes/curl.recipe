@@ -1,0 +1,8 @@
+name:           curl
+version:        8.7.1
+builder:        autotools
+sha256:         b813316b7b4e4f32ca2484f6281a243a3a57c5e4c60f60a4cd3b2b4b6a5d3c2f
+url:            https://curl.se/download/curl-8.7.1.tar.gz
+url_fallback:   https://github.com/curl/curl/releases/download/curl-8_7_1/curl-8.7.1.tar.gz
+depends:        openssl zlib
+configure_args: --with-openssl --with-zlib --enable-ipv6 --disable-ldap

@@ -1,3 +1,4 @@
+SHELL := /bin/bash
 CXX      = g++
 
 #   make PREFIX=/opt/hspm LIVE=/usr install

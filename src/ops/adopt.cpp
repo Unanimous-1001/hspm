@@ -2,6 +2,7 @@
 #include "db/database.hpp"
 #include <cstdlib>
 #include <cctype>
+#include <algorithm>
 
 static void adopt_one(const string& pkg_name, const string& version) {
     PackageRecord existing = db_get_package(pkg_name);
@@ -126,11 +127,36 @@ static void adopt_lfs_base() {
     unordered_set<string> adopted;
     int count = 0;
 
+    vector<string> path_dirs;
+    const char* path_env = std::getenv("PATH");
+    if (path_env) {
+        std::istringstream path_ss(path_env);
+        string path_dir;
+        while (std::getline(path_ss, path_dir, ':')) {
+            if (!path_dir.empty())
+                path_dirs.push_back(path_dir);
+        }
+    }
+    vector<string> default_dirs = {"/usr/bin", "/usr/sbin", "/bin",
+                                   "/sbin", "/usr/local/bin"};
+    for (const auto& d : default_dirs) {
+        if (std::find(path_dirs.begin(), path_dirs.end(), d)
+            == path_dirs.end())
+            path_dirs.push_back(d);
+    }
+
     for (const auto& [binary, pkg_name] : bin_to_pkg) {
         if (adopted.count(pkg_name)) continue;
 
-        string check = "which " + binary + " >/dev/null 2>&1";
-        if (system(check.c_str()) != 0) continue;
+        // check if binary exists in any PATH directory
+        bool found = false;
+        for (const auto& dir : path_dirs) {
+            if (fs::exists(dir + "/" + binary)) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) continue;
 
         PackageRecord existing = db_get_package(pkg_name);
         if (existing.id != -1) {
